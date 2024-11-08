@@ -79,21 +79,10 @@ rho_BEC_TF = np.abs(psi_BEC_TF)**2
 # Imaginary time evolution of mean-field Hamiltonian
 sigma = ksi_BEC
 V_trap = 0.5 * x_vec**2  
-fig, ax = plt.subplots(1,1, figsize = (10,10))
-
-ax.plot(x_vec, V_trap)
-# ax.set_xlim(-5,5)
-plt.show()
-
-
+ 
 # Kinetic energy Hamiltonian in continous space
 H_0 = (1 / dx**2) * np.eye(Nx) + np.diag(-1 / (2 * dx**2) * np.ones(Nx - 1), -1) + np.diag(-1 / (2 * dx**2) * np.ones(Nx - 1), 1)
 
-
-
- 
-
-# Calculating BEC energy in TF ground state
 H_psi_BEC_TF = H_0 @ psi_BEC_TF
 energy_BEC_ground_state_TF = np.conj(psi_BEC_TF) @ H_psi_BEC_TF * dx
 energy = energy_BEC_ground_state_TF
@@ -111,7 +100,6 @@ on_off_interactions_GS = 1
 # Imaginary time evolution loop to obtain ground state with interactions
 while energy_change_velocity > epsilon:
     time_i += 1
-    # Calculate the convolution term for dipolar interactions
     rho = np.abs(psi)**2
     H = H_0 + np.diag(on_off_trap_GS*V_trap + on_off_interactions_GS*rho)
     H_psi = H @ psi
@@ -165,103 +153,91 @@ time_shot = int(Nt/N_shots)
 counter = 0
 on_off_trap = 0
 on_off_interactions = 0
-rho_split_step_vs_t_list = []
-rho_RK45_vs_t_list = []
-psi_space_split_step = psi_BEC_ground_state.copy()  # Initial state for time-evolution
-psi_space_RK45 = psi_BEC_ground_state.copy()  # Initial state for time-evolution
-for n in range(Nt + 1):
-    t = n * dt
-    
-    ####################################################################
-    # Two distinct method for evolving Schroedinger equation
-    #
-    ####################################################################
-    
-    ####################################################################
-    # # 1. Split-operator Fourier method for time evolution
-    # #
-    # # Evolve with kinetic energy in momentum space
-    psi_momentum = np.fft.fft(psi_space_split_step)
-    psi_momentum *= momentum_propagator_free_dt
-    psi_space_split_step = np.fft.ifft(psi_momentum)
 
-    
-    # Evolve with potential energy in real space
-    V_split_step = on_off_trap*V_trap + on_off_interactions*np.abs(psi_space_split_step)**2
-    psi_space_split_step *= np.exp(-1j * dt * V_split_step)
-    ####################################################################
-    
-
-    ####################################################################
-    ## 2. Runge-Kutta 45 algorithm for solving Schroedinger equation
-    V_RK45 = on_off_trap*V_trap + on_off_interactions*np.abs(psi_space_RK45)**2
-    H = H_0 + np.diag(V_RK45)
-    
-    
-    psi_space_RK45 = prepare_RK45_evolution_in_dt(H, psi_space_RK45, dt)
-
-    ####################################################################
-    
-    
-    if(np.mod(n, time_shot) == 0):               
-        counter += 1      
-        rho = np.abs(psi_space)**2                    
-        rho_split_step_vs_t_list.append((t, np.abs(psi_space_split_step)**2))
-        rho_RK45_vs_t_list.append((t, np.abs(psi_space_RK45)**2))
  
- 
- 
+for on_off_trap in [0, 1]:
+    for on_off_interactions in [0, 1]:
+        rho_split_step_vs_t_list = []
+        rho_RK45_vs_t_list = []
+        psi_space_split_step = psi_BEC_ground_state.copy()  # Initial state for time-evolution
+        psi_space_RK45 = psi_BEC_ground_state.copy()  # Initial state for time-evolution
+        for n in range(Nt + 1):
+            t = n * dt                        
+            ####################################################################
+            # # 1. Split-operator Fourier method for time evolution
+            # #
+            # # Evolve with term diagonal in a momentum space
+            psi_momentum = np.fft.fft(psi_space_split_step)
+            psi_momentum *= momentum_propagator_free_dt
+            psi_space_split_step = np.fft.ifft(psi_momentum)            
+            # Evolve with term diagonal in a real space
+            V_split_step = on_off_trap*V_trap + on_off_interactions*np.abs(psi_space_split_step)**2
+            psi_space_split_step *= np.exp(-1j * dt * V_split_step)
+            ####################################################################
+                    
+            ####################################################################
+            ## 2. Runge-Kutta 45 algorithm for solving Schroedinger equation
+            V_RK45 = on_off_trap*V_trap + on_off_interactions*np.abs(psi_space_RK45)**2
+            H = H_0 + np.diag(V_RK45)            
+            psi_space_RK45 = prepare_RK45_evolution_in_dt(H, psi_space_RK45, dt)        
+            ####################################################################            
+            
+            if(np.mod(n, time_shot) == 0):               
+                counter += 1      
+                rho = np.abs(psi_space)**2                    
+                rho_split_step_vs_t_list.append((t, np.abs(psi_space_split_step)**2))
+                rho_RK45_vs_t_list.append((t, np.abs(psi_space_RK45)**2))
+         
+         
+         
+        
+        FontSize = 20        
+        images = []  # List to store frames as images
+        duration = 200
+        # Loop over each time step and create a frame
+        
+        fig, ax = plt.subplots(1, 1)
+        for k in range(0, len(rho_split_step_vs_t_list)):
+            ax.clear()  # Clear the previous plot
+            
+            
+            t = rho_split_step_vs_t_list[k][0]
+            rho_split_step_t = rho_split_step_vs_t_list[k][1]
+            norm_t = np.sum(rho_split_step_t)*dx
+            
+            rho_RK45_t = rho_RK45_vs_t_list[k][1]
+            norm_t = np.sum(rho_RK45_t)*dx
+            
+            print(t)
+            
+            title_string = "Initial state parameters : trap: {:d} | interactions: {:d}".format(on_off_trap_GS, on_off_interactions_GS)
+           
+            ax.set_title(title_string)
+            ax.plot(x_vec, rho_BEC_ground_state, '.-', color = 'black', label='Initial state: Ground State')
+            label_string = "trap: {:d} | interactions : {:d}".format(on_off_trap, on_off_interactions)
+            ax.plot(x_vec, rho_split_step_t, color = 'blue', lw = 3, label=r" | split-step: $t = {:2.2f} | norm = {:2.2f}$".format(t,norm))
+            ax.plot(x_vec, rho_RK45_t, color='red', ls = '--', lw = 2, label=r" | RK45: $t = {:2.2f} | norm = {:2.2f}$".format(t,norm))
+          
+            
+            ax.text(0.1, 0.9, label_string, transform = ax.transAxes)
+            y_max = np.max(rho_BEC_ground_state)*1.1
+            ax.set_ylim([0, y_max])
+            ax.set_xlabel(r"position $x$")
+            ax.set_ylabel(r"$|\psi(x,t)|^2$")
+            ax.legend()
 
-FontSize = 20
-
-images = []  # List to store frames as images
-duration = 200
-# Loop over each time step and create a frame
-
-fig, ax = plt.subplots(1, 1)
-for k in range(0, len(rho_split_step_vs_t_list)):
-    ax.clear()  # Clear the previous plot
-    
-    
-    t = rho_split_step_vs_t_list[k][0]
-    rho_split_step_t = rho_split_step_vs_t_list[k][1]
-    norm_t = np.sum(rho_split_step_t)*dx
-    
-    rho_RK45_t = rho_RK45_vs_t_list[k][1]
-    norm_t = np.sum(rho_RK45_t)*dx
-    
-    print(t)
-    
-    title_string = "Initial state parameters : trap: {:d} | interactions: {:d}".format(on_off_trap_GS, on_off_interactions_GS)
-   
-    ax.set_title(title_string)
-    ax.plot(x_vec, rho_BEC_ground_state, '.-', color = 'black', label='Initial state: Ground State')
-    label_string = "trap: {:d} | interactions : {:d}".format(on_off_trap, on_off_interactions)
-    ax.plot(x_vec, rho_split_step_t, color = 'blue', lw = 3, label=r" | split-step: $t = {:2.2f} | norm = {:2.2f}$".format(t,norm))
-    ax.plot(x_vec, rho_RK45_t, color='red', ls = '--', lw = 2, label=r" | RK45: $t = {:2.2f} | norm = {:2.2f}$".format(t,norm))
-  
-    
-    ax.text(0.1, 0.9, label_string, transform = ax.transAxes)
-    y_max = np.max(rho_BEC_ground_state)
-    ax.set_ylim([0, y_max])
-    ax.legend()
-    
-   
-    # Draw the plot but do not show it
-    fig.canvas.draw()
-
-    # Convert the plot to an image and append to the list
-    image = np.frombuffer(fig.canvas.tostring_rgb(), dtype='uint8')
-    image = image.reshape(fig.canvas.get_width_height()[::-1] + (3,))
-    images.append(Image.fromarray(image))
-
-# Save all images as an animated GIF
-
-path_gif = './'
-filename_animation = "rho_vs_t_on_off_trap.{:d}_on_off_interactions.{:d}.gif".format(on_off_trap, on_off_interactions)
-filename = path_gif + filename_animation
-images[0].save(filename, save_all=True, append_images=images[1:], duration=duration, loop=0)
-
-# Close the plot to free resources
-plt.close()
-print(f"Animated GIF saved as {filename}")
+            # Draw the plot but do not show it
+            fig.canvas.draw()
+        
+            # Convert the plot to an image and append to the list
+            image = np.frombuffer(fig.canvas.tostring_rgb(), dtype='uint8')
+            image = image.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+            images.append(Image.fromarray(image))
+                     
+        path_gif = './'
+        filename_animation = "rho_vs_t_on_off_trap.{:d}_on_off_interactions.{:d}.gif".format(on_off_trap, on_off_interactions)
+        filename = path_gif + filename_animation
+        images[0].save(filename, save_all=True, append_images=images[1:], duration=duration, loop=0)
+        
+        plt.close()
+        print(f"Animated GIF saved as {filename}")
